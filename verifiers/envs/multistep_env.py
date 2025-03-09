@@ -44,7 +44,7 @@ class MultiStepEnv(Environment):
     @abstractmethod
     def env_response(self, messages: List[Dict[str, str]], **kwargs: Any) -> Dict[str, str]:
         pass
-    
+
     def step(self,
              states: List[Dict[str, Any]],
              llm: LLM,
@@ -80,7 +80,11 @@ class MultiStepEnv(Environment):
             else:
                 states[j]["messages"].append(self.env_response(states[j]["messages"]))
 
-            assert len(states[j]["completion_mask"]) == len(states[j]["completion_ids"])
+            if not len(states[j]["completion_mask"]) == len(states[j]["completion_ids"]):
+                print(states[j]["messages"])
+                print(states[j]["completion_mask"])
+                print(states[j]["completion_ids"])
+                raise ValueError(f"Completion mask and completion ids are not the same length for state {j}")
 
         return states
 
