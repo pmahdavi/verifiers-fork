@@ -1,5 +1,7 @@
 from abc import abstractmethod
-import json
+from concurrent.futures import ThreadPoolExecutor
+import random
+import time
 from typing import List, Dict, Sequence, Any, Union
 
 from datasets import Dataset
@@ -15,6 +17,8 @@ class MultiStepEnv(Environment):
                  few_shot: List[Dict[str, str]] = [],
                  sampling_args: Dict[str, Any] = {},
                  mask_env_response: bool = True,
+                 max_workers: int = 10,
+                 sleep_time: float = 1.0,
                  **kwargs):
         super().__init__(**kwargs)
         self.system_prompt = system_prompt
@@ -26,7 +30,8 @@ class MultiStepEnv(Environment):
         }
         self.sampling_args.update(sampling_args)
         self.env_mask = 0 if mask_env_response else 1
-
+        self.max_workers = max_workers
+        self.sleep_time = sleep_time
     def get_dataset(self, **kwargs: Any) -> Dataset | None:
         pass
 
@@ -54,37 +59,53 @@ class MultiStepEnv(Environment):
         messages_to_step = [states[i]["messages"] for i in live_indices]
         llm_responses = llm.chat(messages_to_step, sampling_params=sampling_params, use_tqdm=False) # type: ignore
 
-        for i, j in enumerate(live_indices):
-            if len(states[j]["prompt_ids"]) == 0:
-                states[j]["prompt_ids"] = llm_responses[i].prompt_token_ids
-            states[j]["messages"].append({"role": "assistant", "content": llm_responses[i].outputs[0].text})
+        #for i, j in enumerate(live_indices):
+        def update_state(j, llm_response):
+            # sleep for 0-1 seconds to avoid rate limiting
+            time.sleep(self.sleep_time * random.random())
+
+            state = states[j].copy()
+            if len(state["prompt_ids"]) == 0:
+                state["prompt_ids"] = llm_response.prompt_token_ids
+            state["messages"].append({"role": "assistant", "content": llm_response.outputs[0].text})
         
             # get token lengths of env response and new completion
-            total_prev_len = len(states[j]["prompt_ids"]) + len(states[j]["completion_ids"])
-            env_response_len  = len(list(llm_responses[i].prompt_token_ids)) - total_prev_len # type: ignore
-            new_completion_len = len(llm_responses[i].outputs[0].token_ids)
+            total_prev_len = len(state["prompt_ids"]) + len(state["completion_ids"])
+            env_response_len  = len(list(llm_response.prompt_token_ids)) - total_prev_len # type: ignore
+            new_completion_len = len(llm_response.outputs[0].token_ids)
 
             # update completion masks
-            states[j]["completion_mask"].extend([self.env_mask] * env_response_len)
-            states[j]["completion_mask"].extend([1] * new_completion_len)
+            state["completion_mask"].extend([self.env_mask] * env_response_len)
+            state["completion_mask"].extend([1] * new_completion_len)
 
             # update completion ids
-            states[j]["completion_ids"] = list(llm_responses[i].prompt_token_ids) # type: ignore
-            states[j]["completion_ids"].extend(list(llm_responses[i].outputs[0].token_ids))
-            states[j]["completion_ids"] = states[j]["completion_ids"][len(states[j]["prompt_ids"]):]
+            state["completion_ids"] = list(llm_response.prompt_token_ids) # type: ignore
+            state["completion_ids"].extend(list(llm_response.outputs[0].token_ids))
+            state["completion_ids"] = state["completion_ids"][len(state["prompt_ids"]):]
 
-            if self.is_completed(states[j]["messages"]) or len(states[j]["completion_ids"]) > sampling_params.max_tokens: # type: ignore
-                states[j]["completed"] = True
-                states[j]["completion_ids"] = states[j]["completion_ids"][:sampling_params.max_tokens]
-                states[j]["completion_mask"] = states[j]["completion_mask"][:sampling_params.max_tokens]
+            if self.is_completed(state["messages"]) or len(state["completion_ids"]) > sampling_params.max_tokens: # type: ignore
+                state["completed"] = True
+                state["completion_ids"] = state["completion_ids"][:sampling_params.max_tokens]
+                state["completion_mask"] = state["completion_mask"][:sampling_params.max_tokens]
             else:
-                states[j]["messages"].append(self.env_response(states[j]["messages"]))
+                state["messages"].append(self.env_response(state["messages"]))
 
-            if not len(states[j]["completion_mask"]) == len(states[j]["completion_ids"]):
-                print(states[j]["messages"])
-                print(states[j]["completion_mask"])
-                print(states[j]["completion_ids"])
+            if not len(state["completion_mask"]) == len(state["completion_ids"]):
+                print(state["messages"])
+                print(state["completion_mask"])
+                print(state["completion_ids"])
                 raise ValueError(f"Completion mask and completion ids are not the same length for state {j}")
+
+            return j, state
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            results = list(executor.map(
+                lambda args: update_state(*args),
+                [(j, llm_responses[i]) for i, j in enumerate(live_indices)]
+            ))
+
+        for j, state in results:
+            states[j] = state
 
         return states
 
