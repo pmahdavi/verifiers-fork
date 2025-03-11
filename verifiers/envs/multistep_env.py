@@ -88,7 +88,7 @@ class MultiStepEnv(Environment):
             if self.is_completed(state["messages"]) or len(state["completion_ids"]) > sampling_params.max_tokens: # type: ignore
                 state["completed"] = True
                 state["completion_ids"] = state["completion_ids"][:sampling_params.max_tokens]
-                state["completion_mask"] = state["completion_mask"][:sampling_params.max_tokens]
+                state["completion_mask"] = state["completion_mask"][:len(state["completion_ids"])]
             else:
                 state["messages"].append(self.env_response(state["messages"]))
 
