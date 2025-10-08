@@ -99,4 +99,9 @@ ENDPOINTS = {
         "url": "http://0.0.0.0:8002/v1",
         "key": "EMPTY",
     },
+    "gemini-flash": {
+        "model": "gemini-2.5-flash",
+        "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "key": "GEMINI_API_KEY",
+    },
 }
