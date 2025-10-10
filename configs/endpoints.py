@@ -104,4 +104,9 @@ ENDPOINTS = {
         "url": "https://generativelanguage.googleapis.com/v1beta/openai",
         "key": "GEMINI_API_KEY",
     },
+    "qwen2.5-3b": {
+        "model": "Qwen/Qwen2.5-3B-Instruct",
+        "url": "http://0.0.0.0:8000/v1",
+        "key": "EMPTY",
+    },
 }
