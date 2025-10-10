@@ -2,6 +2,8 @@
 
 Run Verifiers training on [Modal](https://modal.com) serverless GPU infrastructure with a single command.
 
+📚 **New to Modal?** Check out the [comprehensive tutorial](TUTORIAL.md) for step-by-step guidance!
+
 ## Quick Start
 
 ```bash
@@ -10,6 +12,11 @@ modal run modal/deploy.py
 
 # Run custom command
 modal run modal/deploy.py --command "your command here"
+
+# Run GSM8K training (recommended for first-time users)
+MODAL_GPU_CONFIG="A100-80GB:2" modal run --detach modal/deploy.py \
+  --command "CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-0.6B --enforce-eager --disable-log-requests & sleep 30 && CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml examples/grpo/train_gsm8k.py" \
+  --experiment-name "my-first-run"
 ```
 
 ## Prerequisites
