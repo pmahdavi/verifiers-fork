@@ -1,0 +1,28 @@
+# Large asset directories
+assets/
+
+# Temporary dataset directories
+hf_dataset*/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store
+
+# Evaluation results
+*_results_*.json

@@ -17,82 +17,60 @@ from math_verify import parse, verify
 from math_verify import LatexExtractionConfig, ExprExtractionConfig
 
 
-def download_image(url: str) -> Optional[str]:
-    """Download image from URL and convert to base64."""
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        image = Image.open(BytesIO(response.content))
-        buffer = BytesIO()
-        # Convert to PNG for consistency
-        image.save(buffer, format="PNG")
-        return base64.b64encode(buffer.getvalue()).decode('utf-8')
-    except Exception as e:
-        print(f"Error downloading image {url}: {e}")
-        return None
+def pil_image_to_base64(pil_img: Image.Image) -> str:
+    """Convert PIL Image to base64 string."""
+    buffer = BytesIO()
+    # Convert to RGB if needed (for consistency)
+    if pil_img.mode not in ('RGB', 'L'):
+        pil_img = pil_img.convert('RGB')
+    # Save as PNG
+    pil_img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 
-def extract_and_encode_images(text: str, image_mapping: Dict[str, str]) -> tuple[str, List[Dict[str, Any]]]:
-    """Extract image references from text and prepare them for multimodal prompt."""
-    # Pattern to match image references like ![](img-0.svg) or ![...](http://...)
-    img_pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
-    
-    images = []
-    
-    def replace_image(match):
-        alt_text = match.group(1)
-        img_ref = match.group(2)
-        
-        # Check if it's a URL
-        if img_ref.startswith(('http://', 'https://')):
-            b64_img = download_image(img_ref)
-            if b64_img:
-                images.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{b64_img}"}
-                })
-                return f"[Image: {alt_text or 'Figure'}]"
-        else:
-            # It's a local reference, check if we have it in mapping
-            if img_ref in image_mapping:
-                b64_img = image_mapping[img_ref]
-                images.append({
-                    "type": "image_url", 
-                    "image_url": {"url": f"data:image/png;base64,{b64_img}"}
-                })
-                return f"[Image: {alt_text or 'Figure'}]"
-        
-        # If we can't load the image, keep the reference
-        return match.group(0)
-    
-    # Replace image references
-    processed_text = re.sub(img_pattern, replace_image, text)
-    
-    return processed_text, images
+def format_prompt(doc: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Format a document into a multimodal prompt.
 
+    Handles PIL Images from HuggingFace Image feature.
 
-def format_prompt(doc: Dict[str, Any], image_mapping: Dict[str, str] = {}) -> List[Dict[str, Any]]:
-    """Format a document into a multimodal prompt."""
+    Args:
+        doc: Dataset example with 'problem', 'choices', 'answer_type', and 'images' (PIL Images)
+
+    Returns:
+        List of chat messages (OpenAI format)
+    """
     problem_text = doc.get("problem", "")
     choices = doc.get("choices", "")
-    answer_type = doc.get("answer_type", "Multiple_Choice")
-    
-    # Extract and process images from problem text
-    processed_problem, problem_images = extract_and_encode_images(problem_text, image_mapping)
-    
-    # Build the text content
-    if answer_type == "Multiple_Choice":
+    answer_type = doc.get("answer_type", "mc-stand")  # New format: mc-stand, mc-dep, yes-no
+    pil_images = doc.get("images", [])  # PIL Images from HuggingFace dataset
+
+    # Remove markdown image references from problem text (images are separate now)
+    # Pattern: ![...](filename.ext)
+    processed_problem = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', r'[Image: \1]', problem_text)
+
+    # Build the text content based on answer type
+    if answer_type.startswith("mc-"):  # mc-stand or mc-dep
         text_content = f"{processed_problem}\n\n{choices}\n\nProvide the number of the correct option (1-5) inside \\boxed{{}}."
-    else:  # Yes/No
+    elif answer_type.startswith("yes-no"):  # yes-no
         text_content = f"{processed_problem}\n\nAnswer with Yes or No inside \\boxed{{}}."
-    
-    # Build content - use simple string if no images, multimodal list if images present
-    if problem_images:
-        # Multimodal format (images present)
-        content = [{"type": "text", "text": text_content}]
-        content.extend(problem_images)
     else:
-        # Simple string format (no images) - compatible with vf-tui
+        # Fallback for old format
+        text_content = f"{processed_problem}\n\nProvide your answer inside \\boxed{{}}."
+
+    # Build multimodal content
+    content = [{"type": "text", "text": text_content}]
+
+    # Add PIL Images as base64 (HuggingFace Image feature automatically decodes to PIL)
+    for pil_img in pil_images:
+        b64_img = pil_image_to_base64(pil_img)
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{b64_img}"}
+        })
+
+    # If no images, simplify to string (for text-only model compatibility)
+    if not pil_images:
         content = text_content
 
     prompt = [
@@ -375,11 +353,7 @@ def load_environment(
     
     if not all_data:
         raise ValueError("No data found with the given filters")
-    
-    # TODO: In a real implementation, we'd need to handle image loading
-    # For now, we'll create an empty image mapping
-    image_mapping = {}
-    
+
     # Convert to dataset format
     dataset_items = []
     for doc in all_data:
@@ -400,8 +374,11 @@ def load_environment(
             "exam_directory": doc.get("exam_directory"),
         }
 
+        # MongoDB version: no images (for backward compatibility)
+        doc["images"] = []  # Add empty images list
+
         item = {
-            "prompt": format_prompt(doc, image_mapping),
+            "prompt": format_prompt(doc),
             "answer": answer,
             "info": info_dict,
         }
@@ -431,64 +408,56 @@ def load_environment(
     else:
         parser = vf.Parser(extract_fn=extract_boxed_answer)
     
-    # Define sophisticated reward function matching dataset-evolution grading
+    # Reward function for INOI problems with math verification and choice parsing
     def correct_answer_reward_func(parser, completion, answer, info=None, **kwargs):
         """
-        Sophisticated grading that matches the dataset-evolution logic.
-        Handles choice parsing, expression equivalence, and multiple answer formats.
+        Grading function for INOI environment.
+        - Assumes model follows \\boxed{} format (enforced by system prompt)
+        - Handles multiple choice and yes/no questions
+        - Uses math_verify for expression equivalence
         """
-        # Extract grading fields from info dict
         if info is None:
             info = {}
+
+        # Extract boxed answer (returns None if not found)
+        extracted = parser.parse_answer(completion)
+        if not extracted:
+            return 0.0
+
         answer_type = info.get("answer_type")
-        choices = info.get("choices", "")
-        answer_value = info.get("answer_value", "")
-        correct_option = info.get("correct_option", "")
 
-        # Extract the boxed answer from completion
-        boxed_match = parser.parse_answer(completion)
-        if not boxed_match:
-            return 0.0
+        # === Multiple Choice Grading ===
+        if answer_type == "Multiple_Choice":
+            correct_option = info.get("correct_option", "")
+            answer_value = info.get("answer_value", "")
 
-        # Parse the extracted answer
-        parsed = parse_choice(boxed_match)
-        if not parsed:
-            # Try direct string matching
-            if answer_type == "Yes/No":
-                response = boxed_match.strip().lower()
-                target = answer_value.strip().lower()
-                if response in ['yes', 'y', '1', 'true'] and target in ['yes', 'y', '1', 'true']:
+            # Parse extracted answer for choice number
+            parsed = parse_choice(extracted)
+            if parsed:
+                choice_num, raw_value = parsed
+
+                # Direct choice number match (1-5 or A-E)
+                if choice_num and str(choice_num) == correct_option:
                     return 1.0
-                if response in ['no', 'n', '0', 'false'] and target in ['no', 'n', '0', 'false']:
+
+                # Math verification against ground truth answer_value
+                if raw_value and verify_expression_with_math_verify(raw_value, answer_value):
                     return 1.0
-            return 0.0
 
-        standardized_choice_key, raw_value = parsed
-
-        # If we got a direct choice number (1-5 or A-E), check against correct_option
-        if standardized_choice_key is not None:
-            if str(standardized_choice_key) == correct_option:
+            # Fallback: direct string match for simple numeric answers
+            if extracted.strip() == correct_option:
                 return 1.0
 
-        # If raw_value is a plain number 1-5, treat it as a choice number
-        if raw_value and raw_value.strip() in ['1', '2', '3', '4', '5']:
-            if raw_value.strip() == correct_option:
-                return 1.0
+        # === Yes/No Question Grading ===
+        elif answer_type == "Yes/No":
+            target = info.get("answer_value", "").strip().lower()
+            response = extracted.strip().lower()
 
-        # Try to match against answer_value using expression equivalence
-        if raw_value and answer_value:
-            if verify_expression_with_math_verify(raw_value, answer_value):
+            # Flexible yes/no matching
+            if response in ['yes', 'y'] and target in ['yes', 'y']:
                 return 1.0
-
-        # If no direct match, try matching the value against choices
-        if choices and not standardized_choice_key:
-            parsed_choices = parse_choices_block(choices)
-            for choice_expr, choice_num in parsed_choices.items():
-                if choice_expr == "_unlabeled":
-                    continue
-                if verify_expression_with_math_verify(choice_expr, raw_value):
-                    if str(choice_num) == correct_option:
-                        return 1.0
+            if response in ['no', 'n'] and target in ['no', 'n']:
+                return 1.0
 
         return 0.0
     
