@@ -555,7 +555,7 @@ def prepare_dataset_from_hf(
 
 
 def load_environment(
-    dataset_name: str = "pxm5426/inoi-dataset",
+    dataset_name: str = "pmahdavi/inoi",
     split_train: str = "train",
     split_eval: Optional[str] = "test",
     num_train_examples: int = -1,

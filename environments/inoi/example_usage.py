@@ -23,7 +23,7 @@ def basic_example():
 
     # Load environment from HuggingFace
     env = load_environment(
-        dataset_name="pxm5426/inoi-dataset",
+        dataset_name="pmahdavi/inoi",
         num_train_examples=10,
         num_eval_examples=5,
         use_think=True,  # Enable chain-of-thought reasoning
@@ -75,7 +75,7 @@ def multimodal_filtering_example():
 
     # Load text-only problems
     env_text = load_environment(
-        dataset_name="pxm5426/inoi-dataset",
+        dataset_name="pmahdavi/inoi",
         filter_multimodal=False,  # Keep only text-only
         num_train_examples=100,
     )
@@ -83,7 +83,7 @@ def multimodal_filtering_example():
 
     # Load multimodal problems
     env_multimodal = load_environment(
-        dataset_name="pxm5426/inoi-dataset",
+        dataset_name="pmahdavi/inoi",
         filter_multimodal=True,  # Keep only multimodal
         num_train_examples=100,
     )
@@ -104,7 +104,7 @@ def evaluation_example():
 
     # Load environment
     env = load_environment(
-        dataset_name="pxm5426/inoi-dataset",
+        dataset_name="pmahdavi/inoi",
         num_eval_examples=5,
         use_think=True,
     )
@@ -148,7 +148,7 @@ def dataset_generation_example():
 
     # Load environment
     env = load_environment(
-        dataset_name="pxm5426/inoi-dataset",
+        dataset_name="pmahdavi/inoi",
         num_eval_examples=10,
     )
 
