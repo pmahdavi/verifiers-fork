@@ -110,8 +110,8 @@ def format_prompt(doc: Dict[str, Any]) -> List[Dict[str, Any]]:
         # Fallback for unknown format
         text_content = f"{processed_problem}\n\nProvide your answer inside \\boxed{{}}."
 
-    # Build multimodal content
-    content: Any = [{"type": "text", "text": text_content}]
+    # Build multimodal content - always use list format for consistency
+    content: List[Dict[str, Any]] = [{"type": "text", "text": text_content}]
 
     # Add PIL Images as base64 (HuggingFace Image feature automatically decodes to PIL)
     for idx, pil_img in enumerate(pil_images):
@@ -125,9 +125,8 @@ def format_prompt(doc: Dict[str, Any]) -> List[Dict[str, Any]]:
             logger.error(f"Failed to encode image {idx}: {e}")
             raise
 
-    # If no images, simplify to string (for text-only model compatibility)
-    if not pil_images:
-        content = text_content
+    # Note: Always use list format, even for text-only, to ensure consistent schema
+    # OpenAI API supports both formats
 
     prompt = [{"role": "user", "content": content}]
     return prompt
