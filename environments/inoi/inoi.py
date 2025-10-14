@@ -110,25 +110,30 @@ def format_prompt(doc: Dict[str, Any]) -> List[Dict[str, Any]]:
         # Fallback for unknown format
         text_content = f"{processed_problem}\n\nProvide your answer inside \\boxed{{}}."
 
-    # Build multimodal content - always use list format for consistency
-    content: List[Dict[str, Any]] = [{"type": "text", "text": text_content}]
+    # Check if there are images to determine format
+    has_images = pil_images and len(pil_images) > 0
 
-    # Add PIL Images as base64 (HuggingFace Image feature automatically decodes to PIL)
-    for idx, pil_img in enumerate(pil_images):
-        try:
-            b64_img = pil_image_to_base64(pil_img)
-            content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/png;base64,{b64_img}"}
-            })
-        except ValueError as e:
-            logger.error(f"Failed to encode image {idx}: {e}")
-            raise
+    if has_images:
+        # Multimodal format: use list of content items for images
+        content: List[Dict[str, Any]] = [{"type": "text", "text": text_content}]
 
-    # Note: Always use list format, even for text-only, to ensure consistent schema
-    # OpenAI API supports both formats
+        # Add PIL Images as base64 (HuggingFace Image feature automatically decodes to PIL)
+        for idx, pil_img in enumerate(pil_images):
+            try:
+                b64_img = pil_image_to_base64(pil_img)
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{b64_img}"}
+                })
+            except ValueError as e:
+                logger.error(f"Failed to encode image {idx}: {e}")
+                raise
 
-    prompt = [{"role": "user", "content": content}]
+        prompt = [{"role": "user", "content": content}]
+    else:
+        # Text-only format: use simple string (compatible with standard chat templates)
+        prompt = [{"role": "user", "content": text_content}]
+
     return prompt
 
 
