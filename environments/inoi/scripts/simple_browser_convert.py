@@ -126,20 +126,20 @@ async def main():
     print("Simple Browser SVG Conversion")
     print("="*60)
 
-    assets = Path("assets/First Round")
-    failed_dirs = [5, 6, 7, 17, 18, 19, 20, 26, 28, 29, 30, 32, 34]
+    assets_svg_dir = Path("assets_svg")
+    assets_png_dir = Path("assets")
 
-    # Find SVGs to convert
+    # Find all SVGs in assets_svg/ that don't have PNGs in assets/
     to_convert = []
-    for dir_num in failed_dirs:
-        svg_dir = assets / str(dir_num)
-        if svg_dir.exists():
-            for svg in svg_dir.glob("*.svg"):
-                png = svg.with_suffix('.png')
-                if not png.exists():
-                    to_convert.append((svg, png))
+    for svg_path in assets_svg_dir.glob("*.svg"):
+        png_name = svg_path.stem + ".png"
+        png_path = assets_png_dir / png_name
+        if not png_path.exists():
+            to_convert.append((svg_path, png_path))
 
     print(f"\nFound {len(to_convert)} SVGs to convert")
+    print(f"Source: assets_svg/")
+    print(f"Target: assets/")
     print(f"Using 4 parallel workers...\n")
 
     if not to_convert:

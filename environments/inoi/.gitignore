@@ -1,8 +1,14 @@
 # Large asset directories
 assets/
 
-# Temporary dataset directories
+# Dataset directories
+data/
+inoi_dataset*/
 hf_dataset*/
+
+# Evaluation results (keep structure, ignore large files)
+outputs/**/*.jsonl
+outputs/**/*.arrow
 
 # Python cache
 __pycache__/
