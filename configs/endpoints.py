@@ -119,4 +119,9 @@ ENDPOINTS = {
         "url": "http://0.0.0.0:8000/v1",
         "key": "EMPTY",
     },
+    "qwen-vl-modal": {
+        "model": "Qwen/Qwen3-VL-32B-Thinking",
+        "url": "https://ota-merge--vllm-endpoint-web.modal.run/v1",
+        "key": "EMPTY",
+    },
 }
