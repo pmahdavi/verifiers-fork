@@ -1,1 +1,0 @@
-{"env": "inoi", "model": "gemini-2.5-flash", "num_examples": 227, "rollouts_per_example": 4, "sampling_args": {"max_tokens": 30000}, "date": "2025-10-12 22:19:47", "time_ms": 2115678.7309646606, "avg_reward": 0.6431718061674009, "avg_correct_answer_reward_func": 0.6431718061674009, "avg_format_reward_func": 1.0}

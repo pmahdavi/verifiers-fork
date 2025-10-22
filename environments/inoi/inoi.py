@@ -1,11 +1,59 @@
 """
 INOI Environment for mathematical olympiad problems with multimodal support.
 
-This environment supports:
+This environment implements the evaluation logic from the INOI dataset evolution project,
+which was used to evaluate multiple LLMs (Gemini, GPT, Gemma) on 1,135 mathematical
+olympiad problems from the Iranian National Olympiad in Informatics (2006-2024).
+
+## Key Features
+
+### Choice Dependency Logic
+The environment implements a critical distinction between two types of multiple choice problems:
+
+1. **mc-standalone**: Problems where choices should NOT be shown to the model
+   - Model must solve the problem independently and provide the numerical answer
+   - Grading checks if the answer matches the `answer_value` field
+   - Example: "Find the sum of all positive integers n such that..."
+   
+2. **mc-dependent**: Problems where choices MUST be shown to the model
+   - Choices are integral to the problem (e.g., "Which of the following...")
+   - Model must select the correct choice number (1-5)
+   - Grading checks if the choice number matches the `correct_option` field
+
+This distinction prevents the model from accidentally seeing answer options when it
+should solve the problem independently, matching the evaluation methodology.
+
+### Problem Types
+- `mc-standalone`: Standalone multiple choice (no choices shown)
+- `mc-dependent`: Choice-dependent multiple choice (choices shown)
+- `mc-standalone-img`: Standalone with images
+- `mc-dependent-img`: Choice-dependent with images
+- `yes-no`: Yes/No questions (no images)
+- `yes-no-img`: Yes/No questions with images
+
+### Grading System
+The environment uses a multi-strategy grading approach:
+
+1. **Direct match**: For choice numbers (1-5) and Yes/No answers
+2. **Math-verify symbolic**: Algebraic equivalence check
+   - Handles: x^2 + 2x + 1 ≡ (x+1)^2
+   - Supports: LaTeX, plain math, various notations
+3. **Numeric fallback**: Float comparison with 1e-6 tolerance
+   - Handles: 1/2 ≡ 0.5, fractions, decimals
+
+### Supported Features
 - Multiple choice questions with mathematical expressions
 - Yes/No questions
-- Multimodal problems with images
+- Multimodal problems with images (PNG format)
 - Math expression verification using math_verify
+- Nested brace support in \\boxed{} answers
+- LaTeX and plain math notation
+
+## Dataset Source
+HuggingFace: combviz/inoi
+- 1,135 problems (908 train / 227 test)
+- 100% image coverage (1,228 embedded PNG images)
+- Full solutions with step-by-step explanations
 """
 
 import base64
@@ -62,16 +110,25 @@ def validate_dataset_example(doc: Dict[str, Any]) -> None:
     Raises:
         ValueError: If required fields are missing
     """
-    required_fields = ["problem", "answer_type"]
+    required_fields = ["problem", "answer_type", "problem_type"]
     missing = [f for f in required_fields if f not in doc]
     if missing:
         raise ValueError(f"Dataset example missing required fields: {missing}")
 
     # Validate answer_type value
-    valid_answer_types = ["mc-stand", "mc-dep", "yes-no", "Multiple_Choice", "Yes/No"]
+    valid_answer_types = ["Multiple_Choice", "Yes/No"]
     answer_type = doc.get("answer_type", "")
-    if not any(answer_type.startswith(prefix) for prefix in ["mc-", "yes-no", "Multiple_Choice", "Yes/No"]):
+    if answer_type not in valid_answer_types:
         logger.warning(f"Unknown answer_type '{answer_type}'. Valid types: {valid_answer_types}")
+    
+    # Validate problem_type value
+    valid_problem_types = [
+        "mc-standalone", "mc-dependent", "mc-standalone-img", 
+        "mc-dependent-img", "yes-no", "yes-no-img"
+    ]
+    problem_type = doc.get("problem_type", "")
+    if problem_type not in valid_problem_types:
+        logger.warning(f"Unknown problem_type '{problem_type}'. Valid types: {valid_problem_types}")
 
 
 def format_prompt(doc: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -79,9 +136,10 @@ def format_prompt(doc: Dict[str, Any]) -> List[Dict[str, Any]]:
     Format a document into a multimodal prompt.
 
     Handles PIL Images from HuggingFace Image feature.
+    Implements choice dependency logic: shows choices only for mc-dependent problems.
 
     Args:
-        doc: Dataset example with 'problem', 'choices', 'answer_type', and 'images' (PIL Images)
+        doc: Dataset example with 'problem', 'choices', 'answer_type', 'problem_type', and 'images' (PIL Images)
 
     Returns:
         List of chat messages (OpenAI format)
@@ -94,29 +152,42 @@ def format_prompt(doc: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     problem_text = doc["problem"]
     choices = doc.get("choices", "")
-    answer_type = doc.get("answer_type", "mc-stand")
+    answer_type = doc.get("answer_type", "")
+    problem_type = doc.get("problem_type", "")
     pil_images = doc.get("images", [])
 
     # Remove markdown image references from problem text (images are separate now)
     # Pattern: ![...](filename.ext)
     processed_problem = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', r'[Image: \1]', problem_text)
 
-    # Build the text content based on answer type
-    if answer_type.startswith("mc-") or answer_type == "Multiple_Choice":
-        text_content = f"{processed_problem}\n\n{choices}\n\nProvide the number of the correct option (1-5) inside \\boxed{{}}."
-    elif answer_type.startswith("yes-no") or answer_type == "Yes/No":
+    # Build the text content based on answer type and problem type
+    if answer_type == "Multiple_Choice":
+        # CRITICAL: Choice dependency logic matching the evaluation system
+        # mc-standalone: Do NOT show choices (evaluate based on answer_value)
+        # mc-dependent: SHOW choices (evaluate based on correct_option)
+        is_standalone = "standalone" in problem_type
+        
+        if is_standalone:
+            # Standalone MC: Don't show choices, expect numeric answer
+            text_content = f"{processed_problem}\n\nProvide your answer inside \\boxed{{}}."
+        else:
+            # Choice-dependent MC: Show choices, expect choice number
+            text_content = f"{processed_problem}\n\n{choices}\n\nProvide the number of the correct option (1-5) inside \\boxed{{}}."
+    
+    elif answer_type == "Yes/No":
         text_content = f"{processed_problem}\n\nAnswer with Yes or No inside \\boxed{{}}."
+    
     else:
         # Fallback for unknown format
         text_content = f"{processed_problem}\n\nProvide your answer inside \\boxed{{}}."
 
-    # Check if there are images to determine format
+    # Always use list format for consistency (required for HuggingFace datasets)
+    # This prevents PyArrow errors when mixing string and list types
+    content: List[Dict[str, Any]] = [{"type": "text", "text": text_content}]
+    
+    # Add images if present
     has_images = pil_images and len(pil_images) > 0
-
     if has_images:
-        # Multimodal format: use list of content items for images
-        content: List[Dict[str, Any]] = [{"type": "text", "text": text_content}]
-
         # Add PIL Images as base64 (HuggingFace Image feature automatically decodes to PIL)
         for idx, pil_img in enumerate(pil_images):
             try:
@@ -129,11 +200,7 @@ def format_prompt(doc: Dict[str, Any]) -> List[Dict[str, Any]]:
                 logger.error(f"Failed to encode image {idx}: {e}")
                 raise
 
-        prompt = [{"role": "user", "content": content}]
-    else:
-        # Text-only format: use simple string (compatible with standard chat templates)
-        prompt = [{"role": "user", "content": text_content}]
-
+    prompt = [{"role": "user", "content": content}]
     return prompt
 
 
@@ -526,11 +593,18 @@ def prepare_dataset_from_hf(
     """
     def format_example(doc: Dict[str, Any]) -> Dict[str, Any]:
         """Format a single example."""
-        # Determine answer based on answer_type
+        # Determine answer based on answer_type and problem_type
         answer_type = doc.get("answer_type", "")
-        if answer_type in ["Multiple_Choice"] or answer_type.startswith("mc-"):
-            answer = str(doc.get("correct_option", ""))
-        elif answer_type in ["Yes/No"] or answer_type.startswith("yes-no"):
+        problem_type = doc.get("problem_type", "")
+        
+        if answer_type == "Multiple_Choice":
+            # For mc-dependent: answer is the choice number (correct_option)
+            # For mc-standalone: answer is the actual value (answer_value)
+            if "dependent" in problem_type:
+                answer = str(doc.get("correct_option", ""))
+            else:
+                answer = str(doc.get("answer_value", ""))
+        elif answer_type == "Yes/No":
             answer = str(doc.get("answer_value", ""))
         else:
             # Fallback to answer_key
@@ -539,6 +613,7 @@ def prepare_dataset_from_hf(
         # Build info dict with grading metadata
         info_dict = {
             "answer_type": doc.get("answer_type", ""),
+            "problem_type": doc.get("problem_type", ""),
             "choices": doc.get("choices", ""),
             "answer_value": str(doc.get("answer_value", "")),
             "correct_option": str(doc.get("correct_option", "")),
@@ -559,7 +634,7 @@ def prepare_dataset_from_hf(
 
 
 def load_environment(
-    dataset_name: str = "pmahdavi/inoi",
+    dataset_name: str = "combviz/inoi",
     split_train: str = "train",
     split_eval: Optional[str] = "test",
     num_train_examples: int = -1,
@@ -567,13 +642,19 @@ def load_environment(
     use_think: bool = True,
     system_prompt: str = BOXED_SYSTEM_PROMPT,
     filter_multimodal: Optional[bool] = None,
+    filter_problem_type: Optional[str] = None,
     **kwargs
 ) -> vf.Environment:
     """
     Load INOI environment from HuggingFace datasets.
 
+    The environment implements the evaluation logic from the INOI dataset evolution project:
+    - mc-standalone: Choices are NOT shown to the model
+    - mc-dependent: Choices ARE shown to the model
+    - Grading uses math-verify for symbolic/numeric equivalence
+
     Args:
-        dataset_name: HuggingFace dataset identifier
+        dataset_name: HuggingFace dataset identifier (default: "combviz/inoi")
         split_train: Training split name
         split_eval: Evaluation split name (None to use train split)
         num_train_examples: Number of training examples (-1 for all)
@@ -581,6 +662,7 @@ def load_environment(
         use_think: Whether to use ThinkParser for chain-of-thought
         system_prompt: System prompt to use
         filter_multimodal: If True, keep only multimodal; if False, keep only text; if None, keep all
+        filter_problem_type: If specified, filter to specific problem type (e.g., "mc-standalone")
         **kwargs: Additional arguments passed to SingleTurnEnv
 
     Returns:
@@ -588,8 +670,9 @@ def load_environment(
 
     Example:
         >>> env = load_environment(
-        ...     dataset_name="pxm5426/inoi-dataset",
+        ...     dataset_name="combviz/inoi",
         ...     num_train_examples=100,
+        ...     filter_problem_type="mc-standalone",
         ...     use_think=True
         ... )
     """
@@ -601,6 +684,13 @@ def load_environment(
         eval_dataset = load_dataset(dataset_name, split=split_eval)
     else:
         eval_dataset = None
+
+    # Apply problem type filtering if specified
+    if filter_problem_type is not None:
+        logger.info(f"Filtering to problem_type: {filter_problem_type}")
+        train_dataset = train_dataset.filter(lambda x: x.get("problem_type") == filter_problem_type)
+        if eval_dataset:
+            eval_dataset = eval_dataset.filter(lambda x: x.get("problem_type") == filter_problem_type)
 
     # Apply multimodal filtering if specified
     if filter_multimodal is not None:
