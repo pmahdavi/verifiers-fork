@@ -14,10 +14,10 @@ ENDPOINTS = {
         "url": "https://openrouter.ai/api/v1",
         "key": "OPENROUTER_API_KEY",
     },
-    "my-model": {
-        "model": "my-model",
-        "url": "https://some-endpoint.com/v1",
-        "key": "SOME_API_KEY",
+    "local-vllm": {
+        "model": "Qwen/Qwen3-VL-8B-Instruct",
+        "url": "http://0.0.0.0:8000/v1",
+        "key": "EMPTY",
     },
     "gpt-4.1-mini": {
         "model": "gpt-4.1-mini",
