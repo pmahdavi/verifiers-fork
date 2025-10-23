@@ -61,15 +61,16 @@ qstat -u $USER
 
 ### 5. Monitor the Server
 
+Each server creates unique log files based on the model name and port:
+
 ```bash
-# Check the PBS job output (job info, setup, etc.)
-tail -f pbs_results/vllm_server.out
+# View logs (filenames shown after job submission)
+# Format: vllm_{model}_{port}_{type}.log
 
-# Check the vLLM server output (main server logs)
-tail -f pbs_results/vllm_realtime.log
-
-# Check for errors
-tail -f pbs_results/vllm_realtime.err
+# Example for Qwen/Qwen2.5-3B-Instruct on port 8000:
+tail -f pbs_results/vllm_Qwen_Qwen2.5-3B-Instruct_port8000_realtime.log
+tail -f pbs_results/vllm_Qwen_Qwen2.5-3B-Instruct_port8000_realtime.err
+tail -f pbs_results/vllm_Qwen_Qwen2.5-3B-Instruct_port8000_pbs.out
 ```
 
 ### 6. Test the Connection

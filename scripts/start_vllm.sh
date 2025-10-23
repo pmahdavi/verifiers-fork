@@ -6,8 +6,6 @@
 #PBS -N vllm-server
 #PBS -M pxm5426@psu.edu 
 #PBS -m bea
-#PBS -o pbs_results/vllm_server.out
-#PBS -e pbs_results/vllm_server.err
 
 # Change to the directory where the job was submitted from
 cd $PBS_O_WORKDIR
@@ -94,8 +92,25 @@ MODEL_NAME="${MODEL:-$DEFAULT_MODEL}"
 PORT="${PORT:-8000}"
 HOST=0.0.0.0
 
+# Create unique log filenames based on model and port
+# Convert model name to safe filename (replace / with _)
+MODEL_SAFE=$(echo "$MODEL_NAME" | sed 's/\//_/g')
+LOG_PREFIX="vllm_${MODEL_SAFE}_port${PORT}"
+PBS_OUT_LOG="pbs_results/${LOG_PREFIX}_pbs.out"
+PBS_ERR_LOG="pbs_results/${LOG_PREFIX}_pbs.err"
+REALTIME_LOG="pbs_results/${LOG_PREFIX}_realtime.log"
+REALTIME_ERR="pbs_results/${LOG_PREFIX}_realtime.err"
+
+# Redirect PBS stdout and stderr to unique files
+exec > "$PBS_OUT_LOG" 2> "$PBS_ERR_LOG"
+
 echo "Model from PBS variable: ${MODEL:-not set, using default}"
 echo "Port from PBS variable: ${PORT:-not set, using default}"
+echo "Log files:"
+echo "  PBS output: $PBS_OUT_LOG"
+echo "  PBS errors: $PBS_ERR_LOG"
+echo "  Server log: $REALTIME_LOG"
+echo "  Server errors: $REALTIME_ERR"
 
 echo "=========================================="
 echo "vLLM Server Configuration:"
@@ -111,8 +126,6 @@ echo ""
 # Redirect output in real-time to avoid PBS buffering
 echo "Starting vLLM server with 4 GPUs (tensor parallel)..."
 echo "Command: vf-vllm --model $MODEL_NAME --tensor-parallel-size 4 --host $HOST --port $PORT --enforce-eager --disable-log-requests"
-echo "Output will be written to: pbs_results/vllm_realtime.log"
-echo "Errors will be written to: pbs_results/vllm_realtime.err"
 echo ""
 
 # Use stdbuf to disable buffering and redirect to log files
@@ -123,7 +136,7 @@ stdbuf -o0 -e0 vf-vllm \
     --port "$PORT" \
     --enforce-eager \
     --disable-log-requests \
-    > pbs_results/vllm_realtime.log 2> pbs_results/vllm_realtime.err
+    > "$REALTIME_LOG" 2> "$REALTIME_ERR"
 
 echo ""
 echo "vLLM server stopped at: $(date)"

@@ -59,14 +59,19 @@ echo "Submitting PBS job..."
 # Submit the job with the model name and port as variables
 JOB_ID=$(qsub -v MODEL="$MODEL_NAME",PORT="$PORT" "$SCRIPT_DIR/start_vllm.sh")
 
+# Create log filename prefix for this server
+MODEL_SAFE=$(echo "$MODEL_NAME" | sed 's/\//_/g')
+LOG_PREFIX="vllm_${MODEL_SAFE}_port${PORT}"
+
 echo "Job submitted: $JOB_ID"
 echo ""
 echo "Monitor the job with:"
 echo "  qstat $JOB_ID"
 echo ""
 echo "View logs with:"
-echo "  tail -f pbs_results/vllm_realtime.log"
-echo "  tail -f pbs_results/vllm_realtime.err"
+echo "  tail -f pbs_results/${LOG_PREFIX}_realtime.log"
+echo "  tail -f pbs_results/${LOG_PREFIX}_realtime.err"
+echo "  tail -f pbs_results/${LOG_PREFIX}_pbs.out"
 echo ""
 echo "Once the server is running, use it with:"
 echo "  uv run vf-eval <environment> -m $ENDPOINT_NAME"
