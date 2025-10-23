@@ -106,11 +106,23 @@ exec > "$PBS_OUT_LOG" 2> "$PBS_ERR_LOG"
 
 echo "Model from PBS variable: ${MODEL:-not set, using default}"
 echo "Port from PBS variable: ${PORT:-not set, using default}"
+echo "vLLM flags from PBS variable: ${VLLM_FLAGS:-not set, using defaults}"
 echo "Log files:"
 echo "  PBS output: $PBS_OUT_LOG"
 echo "  PBS errors: $PBS_ERR_LOG"
 echo "  Server log: $REALTIME_LOG"
 echo "  Server errors: $REALTIME_ERR"
+
+# Set vLLM flags - use custom flags if provided, otherwise use defaults
+if [ -n "$VLLM_FLAGS" ]; then
+    # Custom flags provided
+    VLLM_CONFIG="$VLLM_FLAGS"
+    CONFIG_TYPE="custom"
+else
+    # Default configuration: tensor parallelism for compatibility
+    VLLM_CONFIG="--tensor-parallel-size 4 --enforce-eager"
+    CONFIG_TYPE="default (tensor parallel)"
+fi
 
 echo "=========================================="
 echo "vLLM Server Configuration:"
@@ -118,24 +130,24 @@ echo "  Model: $MODEL_NAME"
 echo "  Host: $HOST"
 echo "  Port: $PORT"
 echo "  GPUs: CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
-echo "  Tensor Parallel Size: 4"
+echo "  Config: $CONFIG_TYPE"
+echo "  Flags: $VLLM_CONFIG"
 echo "=========================================="
 echo ""
 
-# Start vLLM server with tensor parallelism across 4 GPUs
+# Start vLLM server
 # Redirect output in real-time to avoid PBS buffering
-echo "Starting vLLM server with 4 GPUs (tensor parallel)..."
-echo "Command: vf-vllm --model $MODEL_NAME --tensor-parallel-size 4 --host $HOST --port $PORT --enforce-eager --disable-log-requests"
+echo "Starting vLLM server..."
+echo "Command: vf-vllm --model $MODEL_NAME --host $HOST --port $PORT $VLLM_CONFIG"
 echo ""
 
 # Use stdbuf to disable buffering and redirect to log files
+# Note: We intentionally don't quote $VLLM_CONFIG to allow word splitting
 stdbuf -o0 -e0 vf-vllm \
     --model "$MODEL_NAME" \
-    --tensor-parallel-size 4 \
     --host "$HOST" \
     --port "$PORT" \
-    --enforce-eager \
-    --disable-log-requests \
+    $VLLM_CONFIG \
     > "$REALTIME_LOG" 2> "$REALTIME_ERR"
 
 echo ""
