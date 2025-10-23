@@ -86,7 +86,7 @@ def web():
     except (ValueError, IndexError):
         tensor_parallel_size = 1
     
-    print(f"🚀 Starting vLLM OpenAI server")
+    print("🚀 Starting vLLM OpenAI server")
     print(f"   Model: {DEFAULT_MODEL}")
     print(f"   Tensor parallel size: {tensor_parallel_size}")
     
@@ -136,11 +136,11 @@ def main(model: str = DEFAULT_MODEL):
         modal deploy modal/vllm_endpoint.py --model "Qwen/Qwen2.5-7B-Instruct"
         MODAL_GPU_CONFIG="A100-80GB:2" modal deploy modal/vllm_endpoint.py
     """
-    print(f"\n🚀 Deploying vLLM Endpoint")
-    print(f"="*60)
+    print("\n🚀 Deploying vLLM Endpoint")
+    print("="*60)
     print(f"Model: {model}")
     print(f"GPU Config: {DEFAULT_GPU_CONFIG}")
-    print(f"="*60)
+    print("="*60)
     
     # Parse GPU config for cost estimation
     if ":" in DEFAULT_GPU_CONFIG:
@@ -168,29 +168,29 @@ def main(model: str = DEFAULT_MODEL):
     }
     gpu_cost = next((v for k, v in cost_per_gpu.items() if gpu_type.startswith(k)), 2.10)
     
-    print(f"\n💰 Estimated Cost:")
+    print("\n💰 Estimated Cost:")
     print(f"  - Base: ~${gpu_count * gpu_cost:.2f}/hour (while serving requests)")
     print(f"  - Idle: ~${gpu_count * gpu_cost * 0.1:.2f}/hour (5 min idle timeout)")
-    print(f"  - Note: Container scales to zero when idle > 5 minutes")
+    print("  - Note: Container scales to zero when idle > 5 minutes")
     
-    print(f"\n📝 After deployment, you'll receive a URL like:")
-    print(f"  https://your-username--vllm-endpoint-web.modal.run")
+    print("\n📝 After deployment, you'll receive a URL like:")
+    print("  https://your-username--vllm-endpoint-web.modal.run")
     
-    print(f"\n🔧 Add to configs/endpoints.py:")
-    print(f'  "qwen-vl-modal": {{')
+    print("\n🔧 Add to configs/endpoints.py:")
+    print('  "qwen-vl-modal": {')
     print(f'      "model": "{model}",')
-    print(f'      "url": "https://YOUR-USERNAME--vllm-endpoint-web.modal.run/v1",')
-    print(f'      "key": "EMPTY",')
-    print(f'  }}')
+    print('      "url": "https://YOUR-USERNAME--vllm-endpoint-web.modal.run/v1",')
+    print('      "key": "EMPTY",')
+    print('  }')
     
-    print(f"\n📊 Then run evaluations locally:")
-    print(f'  uv run vf-eval inoi -m qwen-vl-modal -n -1 -r 4 -a \'{{"use_think": false}}\' -s -v')
+    print("\n📊 Then run evaluations locally:")
+    print('  uv run vf-eval inoi -m qwen-vl-modal -n -1 -r 4 -a \'{"use_think": false}\' -s -v')
     
-    print(f"\n⚠️  To stop the endpoint:")
-    print(f"  modal app stop vllm-endpoint")
+    print("\n⚠️  To stop the endpoint:")
+    print("  modal app stop vllm-endpoint")
     
-    print(f"\n✅ Deployment instructions complete!")
-    print(f"="*60)
+    print("\n✅ Deployment instructions complete!")
+    print("="*60)
 
 
 if __name__ == "__main__":

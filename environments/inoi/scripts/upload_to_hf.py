@@ -33,7 +33,7 @@ def upload_text_only(dataset_path: str, repo_id: str, private: bool = False):
     print(f"   ✓ Loaded: {len(dataset['train'])} train + {len(dataset['test'])} test examples")
     
     # Display sample
-    print(f"\n2. Sample record:")
+    print("\n2. Sample record:")
     sample = dataset['train'][0]
     print(f"   ID: {sample['id']}")
     print(f"   Problem images: {sample['images_list']}")
@@ -50,11 +50,11 @@ def upload_text_only(dataset_path: str, repo_id: str, private: bool = False):
         commit_message="Upload INOI dataset with image references"
     )
     
-    print(f"\n✓ Upload complete!")
+    print("\n✓ Upload complete!")
     print(f"\n📦 Dataset URL: https://huggingface.co/datasets/{repo_id}")
-    print(f"\nNote: Images are NOT embedded. You need to:")
-    print(f"  1. Upload the assets/ directory separately, OR")
-    print(f"  2. Run this script again with --with-images flag")
+    print("\nNote: Images are NOT embedded. You need to:")
+    print("  1. Upload the assets/ directory separately, OR")
+    print("  2. Run this script again with --with-images flag")
 
 
 def upload_with_images(dataset_path: str, assets_path: str, repo_id: str, private: bool = False):
@@ -79,7 +79,7 @@ def upload_with_images(dataset_path: str, assets_path: str, repo_id: str, privat
     print(f"   ✓ Found {len(available_images)} images in {assets_dir}")
     
     # Add PIL Images
-    print(f"\n2. Adding PIL Image objects...")
+    print("\n2. Adding PIL Image objects...")
     
     def add_pil_images(example):
         """Add PIL Images to the example."""
@@ -149,10 +149,10 @@ def upload_with_images(dataset_path: str, assets_path: str, repo_id: str, privat
         'test': test_final
     })
     
-    print(f"   ✓ Images added to all examples")
+    print("   ✓ Images added to all examples")
     
     # Display sample
-    print(f"\n3. Sample record with images:")
+    print("\n3. Sample record with images:")
     sample = final_dataset['train'][0]
     print(f"   ID: {sample['id']}")
     print(f"   Problem PIL images: {len(sample['images'])} images")
@@ -161,7 +161,7 @@ def upload_with_images(dataset_path: str, assets_path: str, repo_id: str, privat
     # Upload
     print(f"\n4. Uploading to {repo_id}...")
     print(f"   Private: {private}")
-    print(f"   This may take a while (~35 MB)...")
+    print("   This may take a while (~35 MB)...")
     
     final_dataset.push_to_hub(
         repo_id,
@@ -169,12 +169,12 @@ def upload_with_images(dataset_path: str, assets_path: str, repo_id: str, privat
         commit_message="Upload INOI dataset with embedded PIL Images"
     )
     
-    print(f"\n✓ Upload complete!")
+    print("\n✓ Upload complete!")
     print(f"\n📦 Dataset URL: https://huggingface.co/datasets/{repo_id}")
-    print(f"\nDataset includes:")
-    print(f"  - 'images': PIL Images for problem (from images_list)")
-    print(f"  - 'solution_images': PIL Images for solution")
-    print(f"  - All text fields with updated references")
+    print("\nDataset includes:")
+    print("  - 'images': PIL Images for problem (from images_list)")
+    print("  - 'solution_images': PIL Images for solution")
+    print("  - All text fields with updated references")
 
 
 def main():

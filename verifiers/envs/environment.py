@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 from datasets import Dataset
 from openai import AsyncOpenAI, BadRequestError, OpenAI
@@ -836,9 +836,12 @@ class Environment(ABC):
                 zipped.append((turn, None))
         assert len(responses) == responses_idx, "Responses not fully consumed"
         assert len(zipped) == len(completion), "Length mismatch"
-        prompt_ids: list[int] = processing_class.apply_chat_template(
-            conversation=prompt,  # type: ignore
-            add_generation_prompt=True,
+        prompt_ids: list[int] = cast(
+            list[int],
+            processing_class.apply_chat_template(
+                conversation=prompt,  # type: ignore
+                add_generation_prompt=True,
+            ),
         )
         messages_consumed = [m for m in prompt]
         prompt_mask: list[int] = [0] * len(prompt_ids)
@@ -900,13 +903,17 @@ class Environment(ABC):
                 while j < len(zipped) and zipped[j][0]["role"] != "assistant":
                     consecutive_messages.append(zipped[j][0])
                     j += 1
-                token_prefix: list[int] = processing_class.apply_chat_template(
-                    conversation=messages_consumed  # type: ignore
+                token_prefix: list[int] = cast(
+                    list[int],
+                    processing_class.apply_chat_template(
+                        conversation=messages_consumed  # type: ignore
+                    ),
                 )
-                token_prefix_with_turn: list[int] = (
+                token_prefix_with_turn: list[int] = cast(
+                    list[int],
                     processing_class.apply_chat_template(
                         conversation=messages_consumed + consecutive_messages,  # type: ignore
-                    )
+                    ),
                 )
                 assert token_prefix_with_turn[: len(token_prefix)] == token_prefix, (
                     f"Token prefix mismatch. Token prefix: {token_prefix}, token prefix with turn: {token_prefix_with_turn}"

@@ -21,7 +21,6 @@ app = modal.App("verifiers-training")
 def build_dependencies():
     """This function is run once during the image build process."""
     import subprocess
-    import os
     from pathlib import Path
 
     # Install core verifiers with training dependencies
@@ -50,7 +49,7 @@ def build_dependencies():
                     print(f"✓ Successfully installed {env_name}")
                 except subprocess.CalledProcessError as e:
                     print(f"⚠️  Failed to install {env_name}: {e}")
-                    print(f"   Skipping and continuing...")
+                    print("   Skipping and continuing...")
 
 # Define persistent volumes for outputs and caches
 outputs_volume = modal.Volume.from_name("verifiers-outputs", create_if_missing=True)
@@ -147,7 +146,6 @@ def run_command(
     """
     import subprocess
     import os
-    import shlex
 
     print("Running with local code mounted from your machine.")
 
@@ -164,7 +162,7 @@ def run_command(
     print("="*60)
     print("Starting command on Modal")
     print("="*60)
-    print(f"Configuration:")
+    print("Configuration:")
     print(f"  - Experiment: {experiment_name}")
     print(f"  - Output directory: {output_dir}")
     print(f"  - Command: {command}")
@@ -228,7 +226,6 @@ def main(
         # Custom experiment name
         modal run modal/deploy.py --command "..." --experiment-name "my-experiment"
     """
-    import time
 
     # Default command if none provided
     if command is None:
@@ -277,10 +274,10 @@ def main(
         gpu_type_actual = actual_gpu_config
         gpu_count_actual = 1
 
-    print(f"\n🚀 Modal Deployment: Verifiers")
-    print(f"="*60)
+    print("\n🚀 Modal Deployment: Verifiers")
+    print("="*60)
     print(f"Experiment: {experiment_name}")
-    print(f"Configuration:")
+    print("Configuration:")
     print(f"  - Command: {command}")
     print(f"  - GPU config: {actual_gpu_config}")
 
@@ -300,11 +297,11 @@ def main(
 
     print(f"  - Estimated cost: ~${gpu_count_actual * gpu_cost:.2f}/hour ({gpu_type_actual} pricing)")
 
-    print(f"\n✅  This script runs your local code on Modal.")
-    print(f"  - Your project directory is mounted into the container.")
-    print(f"  - Changes to your code will be reflected on the next run.")
+    print("\n✅  This script runs your local code on Modal.")
+    print("  - Your project directory is mounted into the container.")
+    print("  - Changes to your code will be reflected on the next run.")
 
-    print(f"="*60)
+    print("="*60)
 
     # Run command
     print("\n📦 Starting command on Modal...")
@@ -313,7 +310,7 @@ def main(
         print(f"✅ Using custom GPU config from MODAL_GPU_CONFIG: {actual_gpu_config}")
     else:
         print(f"ℹ️  Using default GPU config: {actual_gpu_config}")
-        print(f"   To change, set: MODAL_GPU_CONFIG='A100-80GB:8' modal run modal/deploy.py")
+        print("   To change, set: MODAL_GPU_CONFIG='A100-80GB:8' modal run modal/deploy.py")
 
     # Run the command
     result = run_command.remote(
@@ -325,27 +322,27 @@ def main(
 
     # Download results
     if download_results:
-        print(f"\n📥 To download results, use the Modal CLI:")
+        print("\n📥 To download results, use the Modal CLI:")
         print(f"  modal volume get verifiers-outputs {experiment_name} ./outputs/{experiment_name}")
-        print(f"\nOr download individual files programmatically using volume.read_file_into_fileobj()")
+        print("\nOr download individual files programmatically using volume.read_file_into_fileobj()")
 
     print("\n✅ Training session complete!")
 
     # Print useful commands
     print("\n📝 Useful commands:")
-    print(f"  # View logs")
-    print(f"  modal app logs")
-    print(f"  ")
-    print(f"  # Monitor GPU usage")
-    print(f"  modal app stats")
-    print(f"  ")
-    print(f"  # Download results")
+    print("  # View logs")
+    print("  modal app logs")
+    print("  ")
+    print("  # Monitor GPU usage")
+    print("  modal app stats")
+    print("  ")
+    print("  # Download results")
     print(f"  modal volume get verifiers-outputs {experiment_name} ./outputs/{experiment_name}")
-    print(f"  ")
-    print(f"  # List all experiments in volume")
-    print(f"  modal volume ls verifiers-outputs")
-    print(f"  ")
-    print(f"  # List files in this experiment")
+    print("  ")
+    print("  # List all experiments in volume")
+    print("  modal volume ls verifiers-outputs")
+    print("  ")
+    print("  # List files in this experiment")
     print(f"  modal volume ls verifiers-outputs/{experiment_name}")
 
 

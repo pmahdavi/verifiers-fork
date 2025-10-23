@@ -38,7 +38,8 @@ vf_env = load_environment(
 vf_env.rubric.reward_weights = [1.0, 0.25]  # correctness + format
 
 print(f"Training examples: {len(vf_env.get_dataset())}")
-print(f"Eval examples: {len(vf_env.get_eval_dataset())}")
+eval_dataset = vf_env.get_eval_dataset()
+print(f"Eval examples: {len(eval_dataset) if eval_dataset else 0}")
 print(f"Reward functions: {vf_env.rubric.get_reward_func_names()}")
 print(f"Reward weights: {vf_env.rubric.get_reward_weights()}")
 

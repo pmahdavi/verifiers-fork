@@ -138,9 +138,9 @@ async def main():
             to_convert.append((svg_path, png_path))
 
     print(f"\nFound {len(to_convert)} SVGs to convert")
-    print(f"Source: assets_svg/")
-    print(f"Target: assets/")
-    print(f"Using 4 parallel workers...\n")
+    print("Source: assets_svg/")
+    print("Target: assets/")
+    print("Using 4 parallel workers...\n")
 
     if not to_convert:
         print("✓ All SVGs already converted!")
@@ -159,7 +159,7 @@ async def main():
     print(f"Failed: {len(to_convert) - success}")
 
     if success == len(to_convert):
-        print(f"\n✓ ALL CONVERSIONS SUCCESSFUL!")
+        print("\n✓ ALL CONVERSIONS SUCCESSFUL!")
     else:
         print(f"\n⚠ {len(to_convert) - success} conversions failed")
 

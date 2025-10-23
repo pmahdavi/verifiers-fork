@@ -22,13 +22,11 @@ Keyboard Shortcuts:
 import asyncio
 import json
 import subprocess
-from datetime import datetime
-from typing import List, Dict, Optional
+from typing import Optional
 
 from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.widgets import Header, Footer, Static, DataTable, Log
-from textual.widget import Widget
 
 
 class GPUMetrics(Static):
@@ -208,7 +206,7 @@ class AppsTable(DataTable):
                 self._render_table()
             else:
                 self.apps_data = []
-        except Exception as e:
+        except Exception:
             self.apps_data = []
 
     def _render_table(self):

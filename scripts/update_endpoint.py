@@ -65,7 +65,7 @@ def update_endpoints(model_name: str, port: int = 8000, endpoint_name: str = "lo
     
     print(f"  Model: {model_name}")
     print(f"  URL: http://0.0.0.0:{port}/v1")
-    print(f"\nYou can now use this endpoint with:")
+    print("\nYou can now use this endpoint with:")
     print(f"  uv run vf-eval <environment> -m {endpoint_name}")
     
     return True

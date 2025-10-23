@@ -22,7 +22,6 @@ from typing import Dict, List, Optional, Tuple
 from pymongo import MongoClient
 from datasets import Dataset, DatasetDict, Features, Value, Sequence
 import pandas as pd
-from collections import Counter
 
 
 # MongoDB connection configuration
@@ -353,7 +352,7 @@ class INOIMongoDBConverter:
         train_df = df.iloc[:split_idx]
         test_df = df.iloc[split_idx:]
         
-        print(f"\nCreating train/test splits:")
+        print("\nCreating train/test splits:")
         print(f"  Train: {len(train_df)} examples ({train_test_split*100:.0f}%)")
         print(f"  Test: {len(test_df)} examples ({(1-train_test_split)*100:.0f}%)")
         

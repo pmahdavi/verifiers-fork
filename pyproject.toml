@@ -166,7 +166,7 @@ unresolved-import = "warn"
 unknown-argument = "warn"
 
 [tool.ty.src]
-exclude = ["environments"]
+exclude = ["environments", "modal"]
 
 [tool.coverage.run]
 source = ["verifiers"]

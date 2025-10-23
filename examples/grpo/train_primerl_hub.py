@@ -50,7 +50,7 @@ Example with specific environments:
 
 import argparse
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 import verifiers as vf
 
@@ -227,7 +227,7 @@ def main(args):
                 try:
                     value = float(value)
                 except ValueError:
-                    if value.lower() in ["true", "false"]:
+                    if isinstance(value, str) and value.lower() in ["true", "false"]:
                         value = value.lower() == "true"
             env_kwargs[key] = value
     

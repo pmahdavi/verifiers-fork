@@ -36,7 +36,7 @@ def test_connection(host="0.0.0.0", port=8000):
         return True
         
     except Exception as e:
-        print(f"\n❌ Connection failed!")
+        print("\n❌ Connection failed!")
         print(f"Error: {str(e)}")
         print("-" * 60)
         print("\nTroubleshooting:")
