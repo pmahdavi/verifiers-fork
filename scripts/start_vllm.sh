@@ -83,17 +83,19 @@ fi
 
 echo "Final CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
 
-# Set model configuration
-# ** CHANGE THIS to your desired model **
-MODEL_NAME="Qwen/Qwen3-VL-8B-Instruct"
-# Alternative models:
-# MODEL_NAME="Qwen/Qwen2.5-3B-Instruct"
-# MODEL_NAME="google/gemma-2-9b-it"
-# MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
+# Set model configuration from PBS variable or use default
+# Pass model via: qsub -v MODEL="model/name" start_vllm.sh
+# Or use default if not specified
+DEFAULT_MODEL="Qwen/Qwen3-VL-8B-Instruct"
+MODEL_NAME="${MODEL:-$DEFAULT_MODEL}"
 
 # vLLM server configuration
-PORT=8000
+# Can also pass PORT via: qsub -v MODEL="model/name",PORT=8001 start_vllm.sh
+PORT="${PORT:-8000}"
 HOST=0.0.0.0
+
+echo "Model from PBS variable: ${MODEL:-not set, using default}"
+echo "Port from PBS variable: ${PORT:-not set, using default}"
 
 echo "=========================================="
 echo "vLLM Server Configuration:"

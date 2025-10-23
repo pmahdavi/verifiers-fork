@@ -2,39 +2,55 @@
 
 This directory contains PBS scripts to start a vLLM inference server on the cluster. The default configuration uses **4 GPUs** with tensor parallelism for efficient model serving.
 
-## Files Created
+## Files
 
-1. **start_vllm.sh** - PBS script for bash
-2. **test_vllm_connection.py** - Test script to verify server is running
+1. **start_vllm.sh** - PBS script that starts the vLLM server
+2. **launch_vllm.sh** - Convenience script to launch server with any model
+3. **update_endpoint.py** - Python script to update `configs/endpoints.py`
+4. **test_vllm_connection.py** - Test script to verify server is running
 
 ## Quick Start
 
-### 1. Edit the Model Name
+### Method 1: Using the Launch Script (Recommended)
 
-Before submitting, edit `start_vllm.sh` and change the `MODEL_NAME` variable:
-
-```bash
-# In start_vllm.sh, around line 88:
-MODEL_NAME="Qwen/Qwen3-VL-8B-Instruct"  # Change this!
-```
-
-Common models you might use:
-- `meta-llama/Llama-3.1-8B-Instruct`
-- `Qwen/Qwen2.5-3B-Instruct`
-- `google/gemma-2-9b-it`
-- `mistralai/Mistral-7B-Instruct-v0.3`
-
-### 2. Create Output Directory
-
-```bash
-mkdir -p pbs_results
-```
-
-### 3. Submit the Job
+The easiest way to start a vLLM server with any model:
 
 ```bash
 # From the repo root directory
-qsub scripts/start_vllm.sh
+./scripts/launch_vllm.sh Qwen/Qwen2.5-3B-Instruct
+
+# Or with custom port and endpoint name:
+./scripts/launch_vllm.sh Qwen/Qwen2.5-3B-Instruct 8001 my-model
+```
+
+This script will:
+1. Update `configs/endpoints.py` automatically
+2. Submit the PBS job with your model
+3. Print instructions for monitoring and using the server
+
+Common models:
+- `Qwen/Qwen2.5-3B-Instruct`
+- `Qwen/Qwen3-VL-8B-Instruct`
+- `meta-llama/Llama-3.1-8B-Instruct`
+- `google/gemma-2-9b-it`
+- `willcb/DeepSeek-R1-Distill-Qwen-1.5B`
+
+### Method 2: Manual PBS Submission
+
+If you prefer manual control:
+
+```bash
+# 1. Create output directory
+mkdir -p pbs_results
+
+# 2. Submit with model name as variable
+qsub -v MODEL="Qwen/Qwen2.5-3B-Instruct" scripts/start_vllm.sh
+
+# Or with custom port:
+qsub -v MODEL="Qwen/Qwen2.5-3B-Instruct",PORT=8001 scripts/start_vllm.sh
+
+# 3. Update endpoints.py manually
+python scripts/update_endpoint.py Qwen/Qwen2.5-3B-Instruct --port 8000
 ```
 
 ### 4. Check Job Status
@@ -110,17 +126,25 @@ Default port is `8000`. If you need to run multiple vLLM servers:
 
 ### Endpoints Configuration
 
-The `local-vllm` endpoint in `configs/endpoints.py` is currently configured as:
+If you use `launch_vllm.sh`, the endpoint is automatically updated in `configs/endpoints.py`. For manual updates:
+
+```bash
+# Update the local-vllm endpoint
+python scripts/update_endpoint.py Qwen/Qwen2.5-3B-Instruct
+
+# Or create a custom endpoint on a different port
+python scripts/update_endpoint.py Qwen/Qwen2.5-3B-Instruct --port 8001 --name my-model
+```
+
+The endpoint configuration will look like:
 
 ```python
 "local-vllm": {
-    "model": "Qwen/Qwen3-VL-8B-Instruct",  # Must match MODEL_NAME in start_vllm.sh
-    "url": "http://0.0.0.0:8000/v1",       # Update port if you change it
+    "model": "Qwen/Qwen2.5-3B-Instruct",  # Matches your vLLM server
+    "url": "http://0.0.0.0:8000/v1",      # Port matches your server
     "key": "EMPTY",
 },
 ```
-
-**Important**: When you change the `MODEL_NAME` in `start_vllm.sh`, you must also update the `model` field in `configs/endpoints.py` to match.
 
 ## Troubleshooting
 
