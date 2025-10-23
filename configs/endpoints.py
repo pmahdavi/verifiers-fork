@@ -15,8 +15,8 @@ ENDPOINTS = {
         "key": "OPENROUTER_API_KEY",
     },
     "local-vllm": {
-        "model": "Qwen/Qwen3-VL-8B-Instruct",
-        "url": "http://0.0.0.0:8000/v1",
+        "model": "Qwen/Qwen3-VL-2B-Thinking",
+        "url": "http://0.0.0.0:8003/v1",
         "key": "EMPTY",
     },
     "gpt-4.1-mini": {
@@ -122,6 +122,11 @@ ENDPOINTS = {
     "qwen-vl-modal": {
         "model": "Qwen/Qwen3-VL-32B-Thinking",
         "url": "https://ota-merge--vllm-endpoint-web.modal.run/v1",
+        "key": "EMPTY",
+    },
+    "optimized": {
+        "model": "Qwen/Qwen3-VL-2B-Instruct",
+        "url": "http://0.0.0.0:8005/v1",
         "key": "EMPTY",
     },
 }
