@@ -1,0 +1,1 @@
+{"env": "inoi", "model": "anthropic/claude-haiku-4.5", "num_examples": 227, "rollouts_per_example": 4, "sampling_args": {"max_tokens": 30000}, "date": "2025-10-22 21:30:27", "time_ms": 253484.88521575928, "avg_reward": 0.4052863436123348, "avg_correct_answer_reward_func": 0.4052863436123348, "avg_format_reward_func": 1.0}
