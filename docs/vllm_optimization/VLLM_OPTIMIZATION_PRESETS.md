@@ -127,6 +127,50 @@ Quick reference for common vLLM configurations optimized for different use cases
 
 ## Special Configurations
 
+### 🖼️ Vision-Language Models (VL Models)
+**When**: Using multimodal models like Qwen3-VL, LLaVA, etc.
+
+```bash
+# For 2B VL models (higher memory than text-only!)
+./scripts/launch_vllm.sh Qwen/Qwen3-VL-2B-Thinking 8011 qwen3-vl \
+  "--data-parallel-size 4 --max-num-seqs 32 --max-num-batched-tokens 16384 --gpu-memory-utilization 0.95 --max-model-len 40960"
+```
+
+**Important notes**:
+- **VL models use significantly more KV cache** than text-only models (observed: ~4× difference)
+- **Always check "Maximum concurrency" in logs** - don't rely on text-only estimates
+- Vision encoders add substantial memory overhead (~4.4GB per request vs ~1-1.5GB for text-only)
+- **Reduce `max_num_seqs` significantly** compared to text-only models
+
+**Observed example (Qwen3-VL-2B-Thinking)**:
+- **Available KV cache**: 37.15 GB per GPU
+- **Maximum concurrency**: 8.49 requests per GPU @ 40K context
+- **Memory per request**: ~4.4 GB (vs ~1-1.5 GB for text-only 2B models)
+- **Total capacity**: 8.49 × 4 GPUs = ~34 concurrent requests (use `max_num_seqs=32`)
+
+### 🧠 Reasoning Models (Thinking/CoT Models)
+**When**: Using models like DeepSeek-R1, Qwen-Thinking, etc.
+
+```bash
+# For Qwen3-Thinking models
+./scripts/launch_vllm.sh Qwen/Qwen3-VL-2B-Thinking 8011 qwen3-thinking \
+  "--data-parallel-size 4 --max-num-seqs 32 --reasoning-parser qwen3 --max-model-len 40960"
+```
+
+**Important notes**:
+- **Always add `--reasoning-parser <format>`** to parse native reasoning format
+  - `qwen3` for Qwen Thinking models
+  - `deepseek-r1` for DeepSeek R1 models
+- **Do NOT use `<think>` XML tags** in prompts - vLLM handles native format
+- **Generate long sequences** - reasoning models often need 10K-50K tokens
+- **Set higher `max_model_len`** to accommodate reasoning + answer
+
+**Client-side usage**:
+```bash
+# Use use_think: false because vLLM handles reasoning parsing
+uv run vf-eval your-env -m qwen3-thinking -t 32768 -a '{"use_think": false}'
+```
+
 ### 💾 Memory-Constrained
 **When**: GPU memory is limited or want to maximize batch size
 
@@ -175,6 +219,160 @@ Is your model < 7B parameters?
     └─ Model 20B-70B?
         └─ Use TP=4, DP=1
 ```
+
+---
+
+## 🔍 How to Choose max_num_seqs (CRITICAL!)
+
+**⚠️ Don't guess - use vLLM's reported capacity!**
+
+### The Right Way:
+
+1. **Start your server with a conservative `max_num_seqs`** (e.g., 32)
+2. **Check the startup logs** for this line:
+   ```
+   Maximum concurrency for 40,960 tokens per request: 8.49x
+   ```
+3. **Calculate your actual capacity**:
+   ```
+   Per-GPU capacity = 8.49 (from logs)
+   Total capacity = 8.49 × num_gpus (e.g., 8.49 × 4 = ~34)
+   ```
+4. **Set `max_num_seqs` to match** (or slightly below) this capacity
+
+### Real Example:
+
+```bash
+# Start with conservative setting
+./scripts/launch_vllm.sh Qwen/Qwen3-VL-2B-Thinking 8011 test \
+  "--data-parallel-size 4 --max-num-seqs 32 --max-model-len 40960"
+
+# Check logs:
+# INFO: Maximum concurrency for 40,960 tokens per request: 8.49x
+# → 8.49 × 4 GPUs = ~34 total capacity
+
+# ✅ Your setting (32) matches capacity → GOOD!
+# ❌ If you set 96, you'd be 3× over capacity → BAD!
+```
+
+### Why Theoretical Calculations Fail:
+
+**Common mistake**: Estimating KV cache per request
+```python
+# ❌ WRONG - theoretical calculation
+model_size_gb = 4
+available_memory = 48 - 4 = 44
+kv_per_request_estimate = 1.4  # Guess based on model size
+capacity_estimate = 44 / 1.4 = ~31 requests  # WRONG!
+
+# ✅ RIGHT - actual from vLLM
+# Maximum concurrency: 8.49x per GPU
+# → Only ~8 requests per GPU, not 31!
+```
+
+**Why the difference?**
+- Vision encoders use extra memory
+- Activation memory not accounted for
+- CUDA graph memory overhead
+- Safety margins in vLLM's calculation
+
+**🎯 Trust vLLM's "Maximum concurrency" metric, not manual calculations!**
+
+---
+
+## ⚠️ Common Misconceptions
+
+Before diving into configurations, here are critical misconceptions that can lead to poor performance:
+
+### ❌ Myth: "Throughput should remain constant during generation"
+
+**Reality**: Throughput **decreases significantly** during long generation (20K+ tokens).
+
+**Why**: O(n²) attention complexity means each new token takes progressively longer.
+
+**Example**:
+- Start: 800 tok/s (generating tokens 0-5K)
+- Middle: 650 tok/s (generating tokens 10-20K)
+- End: 500 tok/s (generating tokens 25-32K)
+- **~40% degradation is NORMAL!**
+
+**What to do**: Factor this into time estimates. See [LONG_CONTEXT_GENERATION_GUIDE.md](LONG_CONTEXT_GENERATION_GUIDE.md) for details.
+
+### ❌ Myth: "VL models have same KV cache needs as text-only models"
+
+**Reality**: Vision-Language models use **3-4× more KV cache** per request!
+
+**Example** (2B parameter models):
+- Text-only Qwen3-2B: ~1.5 GB per request @ 40K context
+- VL Qwen3-VL-2B: ~4.4 GB per request @ 40K context
+- **3× difference!**
+
+**Impact**: Can only batch 1/3 as many VL requests compared to text-only.
+
+**What to do**: Always check "Maximum concurrency" in logs, don't estimate!
+
+### ❌ Myth: "I can calculate max_num_seqs myself"
+
+**Reality**: Manual calculations **fail badly** for VL models, long contexts, or with CUDA graphs.
+
+**Why manual calculations fail**:
+```python
+# ❌ WRONG approach
+model_size = 4 GB
+available_memory = 48 - 4 = 44 GB
+estimated_kv_per_request = 1.5 GB  # Rough estimate
+capacity = 44 / 1.5 = ~29 requests  # WRONG!
+
+# ✅ RIGHT approach from vLLM logs
+# "Maximum concurrency: 5.63x per GPU"
+actual_capacity = 5.63 × 4 GPUs = ~22 requests  # Correct!
+```
+
+**What to do**: **Always trust vLLM's "Maximum concurrency" metric!**
+
+### ❌ Myth: "More GPUs = always faster"
+
+**Reality**: For small models (< 7B), more GPUs with tensor parallelism = **slower**!
+
+**Why**:
+- TP=4 for 2B model: Each GPU holds 0.5B params, 95% idle, constant communication
+- DP=4 for 2B model: Each GPU holds 2B params, 100% utilized, zero communication
+
+**What to do**: Use data parallelism for models < 7B parameters.
+
+### ❌ Myth: "Setting max_model_len higher = better"
+
+**Reality**: Over-allocating context length **wastes capacity** and hurts performance.
+
+**Example**:
+```bash
+# ❌ BAD: Model supports 256K but you only need 40K
+--max-model-len 262144
+# Result: vLLM reserves KV cache for 256K, fewer concurrent requests
+
+# ✅ GOOD: Set to actual need
+--max-model-len 40960  # 4K prompt + 36K generation
+# Result: Optimal KV cache allocation, more concurrent requests
+```
+
+**What to do**: Set `max_model_len` to realistic maximum, not model's theoretical limit.
+
+### ❌ Myth: "reasoning-parser and use_think: true work together"
+
+**Reality**: These are **mutually exclusive** - using both causes parsing to fail!
+
+**Correct usage**:
+```bash
+# vLLM server (handles native reasoning format)
+--reasoning-parser qwen3
+
+# vf-eval client (don't double-parse!)
+-a '{"use_think": false}'  # Let vLLM handle it
+```
+
+**What to do**: If using `--reasoning-parser` on server, set `use_think: false` in client.
+
+See [LONG_CONTEXT_GENERATION_GUIDE.md](LONG_CONTEXT_GENERATION_GUIDE.md) for more details on these topics.
 
 ---
 
@@ -285,12 +483,37 @@ grep "generation throughput" pbs_results/vllm_*_port8001_realtime.log
 3. Reduce `--max-num-batched-tokens` to 2048
 4. Add quantization: `--quantization awq`
 
+### Problem: Server starts but requests are slow/queued
+
+**Diagnosis**: You set `max_num_seqs` too high for your actual KV cache capacity
+
+**Solution**:
+```bash
+# 1. Check your logs for this line during startup:
+grep "Maximum concurrency" pbs_results/vllm_*_realtime.log
+# Output: Maximum concurrency for 40,960 tokens per request: 8.49x
+
+# 2. Calculate correct max_num_seqs:
+# Per-GPU capacity × num_gpus = total capacity
+# 8.49 × 4 = ~34 (use max_num_seqs=32)
+
+# 3. Restart with correct setting
+./scripts/launch_vllm.sh YourModel 8011 fixed \
+  "--data-parallel-size 4 --max-num-seqs 32"
+```
+
+**Why this happens**:
+- Setting `max_num_seqs=96` when capacity is only 34 causes 3× overcapacity
+- Requests queue up waiting for KV cache space
+- Throughput is throttled by memory, not compute
+
 ### Problem: Lower throughput than expected
 
 **Check**:
 1. Is CUDA graphs enabled? (no `--enforce-eager`)
 2. Is batch size high enough? (check KV cache usage)
 3. Are you using data parallelism for small models?
+4. **Did you check "Maximum concurrency" in logs?** ← Most common issue!
 
 ### Problem: High latency per request
 

@@ -189,6 +189,104 @@ vf-vllm \
     --disable-log-requests
 ```
 
+## Running Multiple vLLM Servers Simultaneously
+
+### ⚠️ Important: GPU Resource Contention
+
+**Each vLLM server uses ALL GPUs** specified in its configuration. You **CANNOT** run multiple servers with overlapping GPUs.
+
+#### Example: Why This Fails
+```bash
+# ❌ BAD: Both servers try to use ALL 4 GPUs
+Server 1: --data-parallel-size 4  (uses GPUs 0,1,2,3)
+Server 2: --data-parallel-size 4  (uses GPUs 0,1,2,3)
+# Result: OOM errors, crashes, conflicts
+```
+
+### ✅ Option 1: Run Servers Sequentially (Recommended)
+
+For evaluating multiple models, run them **one at a time**:
+
+```bash
+# 1. Run evaluation with Model A
+tmux new -s eval-model-a
+uv run vf-eval env -m model-a -n -1 -r 4 -s -v
+# Ctrl+b, d to detach
+
+# 2. After Model A completes, run Model B
+tmux new -s eval-model-b
+uv run vf-eval env -m model-b -n -1 -r 4 -s -v
+# Ctrl+b, d to detach
+```
+
+**Why this is better**:
+- Each server gets full GPU resources (optimal performance)
+- No memory contention
+- Easier to monitor and debug
+- Better total throughput
+
+### ✅ Option 2: Partition GPUs Across Servers
+
+If you **must** run simultaneously, partition the GPUs:
+
+```bash
+# Server 1: 2B model on GPUs 0,1 (data parallel)
+CUDA_VISIBLE_DEVICES=0,1 ./scripts/launch_vllm.sh Qwen/Qwen3-VL-2B 8010 model-2b \
+  "--data-parallel-size 2 --max-num-seqs 32"
+
+# Server 2: 4B model on GPU 2 (single GPU)
+CUDA_VISIBLE_DEVICES=2 ./scripts/launch_vllm.sh Qwen/Qwen3-VL-4B 8011 model-4b \
+  "--max-num-seqs 8"
+
+# Server 3: 8B model on GPU 3 (single GPU)  
+CUDA_VISIBLE_DEVICES=3 ./scripts/launch_vllm.sh Qwen/Qwen3-VL-8B 8012 model-8b \
+  "--max-num-seqs 4"
+```
+
+**Trade-offs**:
+- ✅ Can evaluate multiple models simultaneously
+- ❌ Each server has fewer GPUs (lower throughput per model)
+- ❌ More complex configuration
+- ❌ Harder to optimize each server individually
+
+### Resource Planning Table
+
+| # of Models | Strategy | Config Example | Total Throughput |
+|-------------|----------|----------------|------------------|
+| **1 model** | Sequential | DP=4 on 4 GPUs | **100%** ✅ Best |
+| **2 models** | Partition | DP=2 on 2 GPUs each | **~70%** |
+| **4 models** | Partition | 1 GPU each | **~40%** ❌ Slow |
+
+**Recommendation**: Unless you have a specific need for concurrent serving, **always run sequentially** for best performance.
+
+### Using Tmux for Sequential Evaluations
+
+Create separate tmux sessions for monitoring:
+
+```bash
+# Session 1: 2B model evaluation
+tmux new -s eval-2b
+cd /scratch/pxm5426/repos/verifiers-fork
+uv run vf-eval inoi -m qwen3-2b-32k -t 32768 -n -1 -r 4 -a '{"use_think": false}' -s -v
+# Ctrl+b, d to detach
+
+# Check status later
+tmux a -t eval-2b
+
+# After 2B completes, run 4B
+tmux new -s eval-4b
+uv run vf-eval inoi -m qwen3-4b-32k -t 32768 -n -1 -r 4 -a '{"use_think": false}' -s -v
+# Ctrl+b, d
+```
+
+**Monitor all sessions**:
+```bash
+tmux ls  # List all sessions
+tmux a -t eval-2b  # Attach to specific session
+```
+
+---
+
 ## Stopping the Server
 
 ```bash
@@ -197,6 +295,9 @@ qstat -u $USER
 
 # Delete the job
 qdel <JOB_ID>
+
+# If running multiple servers, stop specific one:
+qdel <JOB_ID_FOR_SPECIFIC_SERVER>
 ```
 
 ## Advanced Usage

@@ -7,11 +7,17 @@ This directory contains comprehensive guides for optimizing vLLM inference serve
 **New to vLLM optimization?** Start here:
 1. Read [WHATS_NEW_VLLM_OPTIMIZATION.md](WHATS_NEW_VLLM_OPTIMIZATION.md) for an overview of changes
 2. Try the optimized presets from [VLLM_OPTIMIZATION_PRESETS.md](VLLM_OPTIMIZATION_PRESETS.md)
-3. Deep dive into [CHUNKED_PREFILL_TUTORIAL.md](CHUNKED_PREFILL_TUTORIAL.md) to understand the internals
+3. **For long-context generation (10K+ tokens)**: Read [LONG_CONTEXT_GENERATION_GUIDE.md](LONG_CONTEXT_GENERATION_GUIDE.md) first!
+4. Deep dive into [CHUNKED_PREFILL_TUTORIAL.md](CHUNKED_PREFILL_TUTORIAL.md) to understand the internals
+
+**Working with specific model types?**
+- Vision-Language models (Qwen3-VL, LLaVA): See VL Models section in [VLLM_OPTIMIZATION_PRESETS.md](VLLM_OPTIMIZATION_PRESETS.md#-vision-language-models-vl-models)
+- Reasoning models (Qwen-Thinking, DeepSeek-R1): See Reasoning Models section in [VLLM_OPTIMIZATION_PRESETS.md](VLLM_OPTIMIZATION_PRESETS.md#-reasoning-models-thinkingcot-models)
+- Multiple models simultaneously: See "Running Multiple Servers" in [VLLM_SERVER_README.md](../../scripts/VLLM_SERVER_README.md#running-multiple-vllm-servers-simultaneously)
 
 ## Documentation Files
 
-### 🤖 [AUTOMATIC_CONFIGURATION.md](AUTOMATIC_CONFIGURATION.md) **NEW!**
+### 🤖 [AUTOMATIC_CONFIGURATION.md](AUTOMATIC_CONFIGURATION.md)
 **Does vLLM have automatic configuration detection?**
 
 Explains what vLLM auto-detects, what it doesn't, and why our documented presets approach is better.
@@ -44,6 +50,7 @@ Copy-paste configurations for different model sizes and use cases.
 - High throughput, balanced, and low-latency configurations
 - Decision trees for choosing the right config
 - Performance monitoring guidelines
+- **Special sections**: Vision-Language models, Reasoning models
 
 ### 🔬 [CHUNKED_PREFILL_TUTORIAL.md](CHUNKED_PREFILL_TUTORIAL.md)
 **Deep dive into chunked prefill mechanism**
@@ -68,6 +75,20 @@ Comprehensive guide analyzing common performance issues and providing specific f
 - Expected performance improvements
 - Benchmarking methodology
 - Advanced optimizations
+
+### 📏 [LONG_CONTEXT_GENERATION_GUIDE.md](LONG_CONTEXT_GENERATION_GUIDE.md) **NEW!**
+**Performance behavior for long-context generation (10K-50K tokens)**
+
+Essential guide for understanding and optimizing very long generation workloads.
+
+**Key Topics:**
+- **Normal performance degradation** during long generation (40-60% slower is expected!)
+- Why throughput decreases over time (O(n²) attention complexity)
+- Performance expectations by generation length
+- Optimization strategies for long contexts
+- **Common misconceptions** debunked
+- Time estimation formulas for planning evaluations
+- Troubleshooting long-context specific issues
 
 ## Quick Examples
 
