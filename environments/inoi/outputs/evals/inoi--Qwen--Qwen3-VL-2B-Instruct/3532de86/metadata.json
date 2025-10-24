@@ -1,0 +1,1 @@
+{"env": "inoi", "model": "Qwen/Qwen3-VL-2B-Instruct", "num_examples": 227, "rollouts_per_example": 4, "sampling_args": {"max_tokens": 32768}, "date": "2025-10-23 23:11:06", "time_ms": 32911312.628269196, "avg_reward": 0.024229074889867842, "avg_correct_answer_reward_func": 0.024229074889867842, "avg_format_reward_func": 1.0}
